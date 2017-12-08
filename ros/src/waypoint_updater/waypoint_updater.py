@@ -45,8 +45,6 @@ class WaypointUpdater(object):
 
     def pose_cb(self, msg):
         # TODO: Implement
-	# First read the msg
-	PoseStamped pose = msg;
 
         pass
 
