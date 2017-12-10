@@ -34,6 +34,12 @@ that we have created in the `__init__` function.
 class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
+        
+        # VARIABLES NEEDED
+        self.dbw_enabled = False
+        self.curr_vel = -1
+        self.proposed_linear = -1
+        self.proposed_angular = -1
 
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
@@ -57,6 +63,9 @@ class DBWNode(object):
         # self.controller = TwistController(<Arguments you wish to provide>)
 
         # TODO: Subscribe to all the topics you need to
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
 
         self.loop()
 
@@ -91,6 +100,22 @@ class DBWNode(object):
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
         self.brake_pub.publish(bcmd)
+        
+	def dbw_enabled_cb(self, msg):
+		self.dbw_enabled = msg.data
+		if self.dbw_enabled: 
+			rospy.loginfo("Carla is now unchained")
+		# Here we have to take care about the car states (the car can swich off the dbw) not sure how to do it (maybe restart controller?)
+		if not self.dbw_enabled:
+			rospy.loginfo("dbw not enabled")
+        
+	def current_velocity_cb(self, msg):
+		self.curr_vel = msg.twist.linear.x
+	
+	def twist_cmd_cb():
+		# Proposed linear and angular velocity since we have this data in reference to the cars position we just care about linear x and angular z
+		self.proposed_linear = msg.twist.linear.x
+		self.proposed_angular = msg.twist.angular.z
 
 
 if __name__ == '__main__':
