@@ -5,13 +5,15 @@ from lowpass import LowPassFilter
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
-# Time between two meassurements = 1/Hz
-DELTA_T = 1/50
+# Time between two meassurements = 1/50Hz
+DELTA_T = 1./50.
 
 # Maybe implement twiddle
-P_VEL = 1.
-I_VEL = 0.
-D_VEL = 1.
+P_THR = 1.
+I_THR = 0.
+D_THR = 1.
+
+MAX_THR = 0.25
 
 TAU = 0
 TS = 0
@@ -33,7 +35,7 @@ class Controller(object):
 		self.max_steer_angle = kwargs['max_steer_angle']
 	
 		# PID for throttle value
-		self.pid_throttle = PID(P_THR, I_THR, D_THR, 0, 0.25)
+		self.pid_throttle = PID(P_THR, I_THR, D_THR, 0, MAX_THR)
 
 		# I don't know how to use the lowpass filter, if anyone does go for it
 		#self.low_pass_filter = LowPassFilter(TAU, TS)
@@ -52,15 +54,17 @@ class Controller(object):
 	def control(self, *args, **kwargs):
 		# TODO: Change the arg, kwarg list to suit your needs
 		# Return throttle, brake, steer
-		self.linear_velocity = kwargs['proposed_linear']
-		self.angular_velocity = kwargs['proposed_angular']
-		self.current_velocity = kwargs['curr_vel']
+		linear_velocity = kwargs['proposed_linear']
+		angular_velocity = kwargs['proposed_angular']
+		current_velocity = kwargs['curr_vel']
+		
+		diff_vel = linear_velocity - current_velocity
+		throttle = self.pid_throttle.step(diff_vel, DELTA_T)
 
-		steering = self.yaw_controller.get_steering(self.linear_velocity, self.angular_velocity,
-													self.current_velocity)
+		steering = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_velocity)
 		if steering > self.max_steer_angle: 
 			# In order keep the lane, if the desired steering angle is > than max_steer_angle, we will 	have to slow down and set the steering to the maximum or slow down until steering < max_steer_angle
 			steering = max_steer_angle
 
 
-		return 0.1, 0.0, steering
+		return throttle, 0.0, steering
