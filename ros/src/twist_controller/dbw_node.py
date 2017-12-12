@@ -58,7 +58,16 @@ class DBWNode(object):
 		self.brake_pub = rospy.Publisher('/vehicle/brake_cmd', BrakeCmd, queue_size=1)
 
 		# TODO: Create `TwistController` object
-		self.controller = Controller(wheel_base=wheel_base, steer_ratio=steer_ratio, max_lat_accel=max_lat_accel, max_steer_angle=max_steer_angle)
+		self.controller = Controller(wheel_base=wheel_base, 
+									steer_ratio=steer_ratio, 
+									max_lat_accel=max_lat_accel, 
+									max_steer_angle=max_steer_angle,
+									vehicle_mass=vehicle_mass,
+									fuel_capacity=fuel_capacity,
+									brake_deadband=brake_deadband,
+									decel_limit=decel_limit,
+									accel_limit=accel_limit,
+									wheel_radius=wheel_radius)
 
 		# TODO: Subscribe to all the topics you need to
 		rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
