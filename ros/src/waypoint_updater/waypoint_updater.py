@@ -4,9 +4,15 @@ import rospy
 import tf
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from sensor_msgs.msg import Image
 
 import math
 import numpy as np
+
+# IMPORTS TO DELETE 
+from cv_bridge import CvBridge, CvBridgeError
+import cv2
+import os
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -38,7 +44,7 @@ class WaypointUpdater(object):
 		#rospy.Subscriber('/traffic_waypoint', Lane, self.traffic_cb)
 		#rospy.Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb)
 
-
+		rospy.Subscriber('/image_color', Image, self.image_cb)
 
 		self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -51,8 +57,13 @@ class WaypointUpdater(object):
 		self.pitch = 0
 		self.roll = 0
 		self.waypoints = []
-
+		self.bridge = CvBridge()
+		
+		rospy.loginfo("*****************PATH:" + os.path.dirname(os.path.abspath(__file__)))
+		
 		self.loop()
+		
+		
 
 
 	def loop(self):
@@ -101,6 +112,18 @@ class WaypointUpdater(object):
 	def obstacle_cb(self, msg):
 		# TODO: Callback for /obstacle_waypoint message. We will implement it later
 		pass
+		
+	def image_cb(self, msg):
+		try:
+			rospy.loginfo("*****************PATH:" + os.getcwd())
+			cv2_img = self.bridge.imgmsg_to_cv2( msg, 'bgr8')
+			n = msg.header.seq
+			
+		except CvBridgeError as e: 
+			rospy.logwarn(e)
+		else:
+			folder = './images/image{}.png'.format(n)
+			cv2.imwrite(folder, cv2_img)
 
 	def get_closest_waypoints(self):
 		# To get the closest waypoint we will use self.pose_x, self.pose_y, self.yaw and self.waypoints 
