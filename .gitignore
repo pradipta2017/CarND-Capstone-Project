@@ -1,0 +1,8 @@
+*.pyc
+*.swp
+data/just_traffic_light.bag
+data/loop_with_traffic_light.bag
+ros/build
+ros/devel
+ros/src/styx/profile.tmp
+
