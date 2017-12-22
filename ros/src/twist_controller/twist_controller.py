@@ -59,22 +59,38 @@ class Controller(object):
 		
 		# Throttle -> since DELTA_T is constant, we only need to know the difference between current velocity and proposed velocity
 		diff_vel = linear_velocity - current_velocity
-		
-		
-		# Brake -> not needed until traffic light detection is done
-		newtons = self.total_vehicle_mass * (diff_vel/DELTA_T)
-		brake_torque = newtons / self.wheel_radius
-		
+
+                # NOTE(jason): not sure if this is the correct usage of these
+                # limits, but seems reasonable based on their configured values
+                if diff_vel > self.accel_limit:
+                    diff_vel = self.accel_limit
+                if diff_vel < self.decel_limit:
+                    diff_vel = self.decel_limit;
+
 		# Logic of throttle/break depending on diff_vel
-		if (diff_vel > 0):
-			brake = 0
+                # NOTE(jason): This check keeps from having a small amount of
+                # throttle happening when we're supposedly stopped.
+		if diff_vel > 0.01:
+                        # NOTE(jason): The throttle in the simulator display
+                        # seems to only ever show 0.02 or 0.9.  This might be
+                        # what's causing some mild braking occasionally (brake
+                        # values < 10)
 			throttle = self.pid_throttle.step(diff_vel, DELTA_T)
-		else:
-			throttle = 0
-			# Magic step! If the desired speed is close to current speed don't break, just let the car go, that will make the car behave smoother
-			if abs(diff_vel) > 1.5:
-				brake = brake_torque * diff_vel * DELTA_T**2 
-			
+                elif diff_vel < -self.brake_deadband:
+                        newtons = self.total_vehicle_mass * (diff_vel/DELTA_T)
+                        brake_torque = newtons / self.wheel_radius
+                        brake = brake_torque * diff_vel * DELTA_T**2 
+                elif linear_velocity == 0.0:
+                        # This makes sure the car stays still when it's
+                        # supposed to be stopped and assumes the prior
+                        # waypoints properly slowed down.
+                        # Might need to modify if the car is on a hill to keep
+                        # from moving.
+                        brake = 10
+                else:
+                        # do nothing if we aren't stopped and minor difference
+                        pass
+
 		steering = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_velocity)
 		if steering > self.max_steer_angle: 
 			# In order keep the lane, if the desired steering angle is > than max_steer_angle, we will 	have to slow down and set the steering to the maximum or slow down until steering < max_steer_angle
