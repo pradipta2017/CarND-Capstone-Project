@@ -10,6 +10,8 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
+import math
+import numpy as np
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -92,16 +94,43 @@ class TLDetector(object):
 
     def get_closest_waypoint(self, pose):
         """Identifies the closest path waypoint to the given position
-            https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
+        https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
-            pose (Pose): position to match a waypoint to
+        pose (Pose): position to match a waypoint to
 
         Returns:
-            int: index of the closest waypoint in self.waypoints
+        int: index of the closest waypoint in self.waypoints
 
         """
         #TODO implement
-        return 0
+        closest_distance = 1000000
+        closest_point = -1
+        pose_x = pose.position.x
+        pose_y = pose.position.y
+        orientation = pose.orientation
+        euler = tf.transformations.euler_from_quaternion(
+        [orientation.x,
+        orientation.y,
+        orientation.z,
+        orientation.w])
+        yaw = euler[2]
+        if self.waypoints is not None:
+	
+            for i in range(len(self.waypoints.waypoints)):
+                wp_x = self.waypoints.waypoints[i].pose.pose.position.x
+                wp_y = self.waypoints.waypoints[i].pose.pose.position.y
+			
+                distance = math.sqrt((pose_x - wp_x)**2 + (pose_y - wp_y)**2)
+
+                # Since we want the closest waypoint ahead, we need to calculate the angle between the car and the waypoint
+                psi = np.arctan2(pose_y - wp_y, pose_x - wp_x)
+                dtheta = np.abs(psi - yaw)
+
+                if (distance < closest_distance and dtheta < np.pi/4) :
+                    closest_distance = distance
+                    closest_point = i
+
+        return closest_point
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
@@ -123,7 +152,7 @@ class TLDetector(object):
         return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
-        """Finds closest visible traffic light, if one exists, and determines its
+	"""Finds closest visible traffic light, if one exists, and determines its
             location and color
 
         Returns:
@@ -131,19 +160,39 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        light = None
+	light = None
 
         # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']
-        if(self.pose):
-            car_position = self.get_closest_waypoint(self.pose.pose)
+	stop_line_positions = self.config['stop_line_positions']
 
         #TODO find the closest visible traffic light (if one exists)
+	stop_at = 999999
 
+	if self.waypoints is not None:
+		car_x = self.pose.pose.position.x
+		car_y = self.pose.pose.position.y
+		
+		for each in self.lights:
+			light_x = each.pose.pose.position.x
+			light_y = each.pose.pose.position.y
+			if(light_x < stop_at):
+				if(light_x > car_x):
+					stop_at = light_x
+					#Need Attention: sometime y value of traffic light is not alligned with waypoint y
+					# car_y is assigned to get an approximation
+					each.pose.pose.position.y = car_y
+					light = each
+				
+
+        '''
+        next_stop_x, next_stop_y will give the (x,y) coordinate of next traffic light.
+        We need to set the 'light' variable to True at a safe distance from where car can slow-down/stop.
+        '''
         if light:
-            state = self.get_light_state(light)
+	    light_wp = self.get_closest_waypoint(light.pose.pose)
+	    state = light.state
             return light_wp, state
-        self.waypoints = None
+        #self.waypoints = None #Need Attention: Not sure why it was set to None
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
