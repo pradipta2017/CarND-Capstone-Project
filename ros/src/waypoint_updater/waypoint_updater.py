@@ -2,6 +2,7 @@
 
 import rospy
 import tf
+from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
 from sensor_msgs.msg import Image
@@ -41,10 +42,10 @@ class WaypointUpdater(object):
 		rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
 		self.base_waypoints_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 		# TODO Later we will need this subscribers, not now
-		#rospy.Subscriber('/traffic_waypoint', Lane, self.traffic_cb)
-		#rospy.Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb)
+		rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+		#rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
-		rospy.Subscriber('/image_color', Image, self.image_cb)
+		#rospy.Subscriber('/image_color', Image, self.image_cb)
 
 		self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -56,33 +57,51 @@ class WaypointUpdater(object):
 		self.yaw = 0
 		self.pitch = 0
 		self.roll = 0
-		self.waypoints = []
+                self.waypoints = []
+		self.traffic_light_index = -1
 		self.bridge = CvBridge()
 		
 		rospy.loginfo("*****************PATH:" + os.path.dirname(os.path.abspath(__file__)))
 		
 		self.loop()
-		
-		
 
 
 	def loop(self):
 		rate = rospy.Rate(50) # Spin 50Hz
 		while not rospy.is_shutdown():
 			index = self.get_closest_waypoints()
+			last_index = index + LOOKAHEAD_WPS
 
 			next_waypoints = Lane()
 			next_waypoints.header.stamp = rospy.Time(0)
 
-			next_waypoints.waypoints = self.waypoints[index:index+LOOKAHEAD_WPS]
+			# TODO(jason): maybe make this deep copy the waypoints
+			# so the velocities don't have to be reset below.
+			next_waypoints.waypoints = self.waypoints[index:last_index]
+
+			#rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
+
+			if self.traffic_light_index != -1 and self.traffic_light_index >= index and self.traffic_light_index <= last_index:
+			    # TODO(jason): calculate decelaration based on the
+			    # distance to the light
+			    velocity = 0.0
+			    for i in range(self.traffic_light_index - index, 0, -1):
+				next_waypoints.waypoints[i].twist.twist.linear.x = min(velocity, next_waypoints.waypoints[i].twist.twist.linear.x)
+				velocity += 0.2
+			else:
+			    for wp in next_waypoints.waypoints:
+				# TODO(jason): need to properly handle
+				# velocity.  This is here to since the waypoint
+				# linear velocity is overwritten on
+				# deceleration.  See above comment about deep
+				# copies.
+				wp.twist.twist.linear.x = 12
 
 			self.final_waypoints_pub.publish(next_waypoints)
 
 			rate.sleep()
-    
 
 	def pose_cb(self, msg):
-
 		self.pose_x = msg.pose.position.x
 		self.pose_y = msg.pose.position.y
 		self.pose_z = msg.pose.position.z # We don't need z position I think
@@ -97,17 +116,17 @@ class WaypointUpdater(object):
 		self.roll = euler[0]
 		self.pitch = euler[1]
 		self.yaw = euler[2]
-	
+
+
 
 	def waypoints_cb(self, waypoints):
-
 		self.waypoints = waypoints.waypoints
 		# Maybe we can unsubscribe from this node since we don't need it anymore
 		self.base_waypoints_sub.unregister()
 
 	def traffic_cb(self, msg):
 		# TODO: Callback for /traffic_waypoint message. Implement
-		pass
+                self.traffic_light_index = msg.data
 
 	def obstacle_cb(self, msg):
 		# TODO: Callback for /obstacle_waypoint message. We will implement it later

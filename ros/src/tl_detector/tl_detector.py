@@ -39,6 +39,7 @@ class TLDetector(object):
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
+        rospy.loginfo("traffic light config: %s", self.config)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
@@ -51,6 +52,8 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
+        self.stop_line_waypoints = []
+
         rospy.spin()
 
     def pose_cb(self, msg):
@@ -58,6 +61,32 @@ class TLDetector(object):
 
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints
+
+        # NOTE(jason): Pre-calculating the stop line positions so the check on
+        # each frame will hopefully do less work by only checking the
+        # stop_line_waypoints list for a close waypoint index
+	stop_line_positions = self.config['stop_line_positions']
+        sl_wp = []
+        for slp in stop_line_positions:
+            best_d = 10
+            sli = -1
+            for i, wp in enumerate(self.waypoints.waypoints):
+                wpx = wp.pose.pose.position.x
+                wpy = wp.pose.pose.position.y
+                d = math.sqrt((wpx - slp[0])**2 + (wpy - slp[1])**2)
+                if d < best_d:
+                    best_d = d
+                    sli = i
+
+            sl_wp.append(sli)
+            wpx = self.waypoints.waypoints[sli].pose.pose.position.x
+            wpy = self.waypoints.waypoints[sli].pose.pose.position.y
+            #rospy.loginfo("found stop line i: %s wpx: %s, wpy: %s, best_d: %s", sli, wpx, wpy, best_d)
+
+        rospy.loginfo("sl_wp: %s", sl_wp)
+
+        self.stop_line_waypoints = sl_wp
+
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -109,11 +138,12 @@ class TLDetector(object):
         pose_y = pose.position.y
         orientation = pose.orientation
         euler = tf.transformations.euler_from_quaternion(
-        [orientation.x,
-        orientation.y,
-        orientation.z,
-        orientation.w])
+            [orientation.x,
+            orientation.y,
+            orientation.z,
+            orientation.w])
         yaw = euler[2]
+
         if self.waypoints is not None:
 	
             for i in range(len(self.waypoints.waypoints)):
@@ -160,40 +190,42 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-	light = None
 
-        # List of positions that correspond to the line to stop in front of for a given intersection
-	stop_line_positions = self.config['stop_line_positions']
+        light_index = -1
+        light_state = TrafficLight.UNKNOWN
+        if self.pose:
+            car_index = self.get_closest_waypoint(self.pose.pose)
 
-        #TODO find the closest visible traffic light (if one exists)
-	stop_at = 999999
+            # NOTE(jason): Look for the stop line waypoint index in ahead
+            # within the waypoint size sent in waypoint_updater.
+            # TODO(jason): This may need to be a shorter range if the lights
+            # are still too small for the classifier to tell what color they
+            # are.  It seems like they're still pretty small in the simulator
+            # when it detects them.
+            for i in self.stop_line_waypoints:
+                if i > car_index and i - car_index < 200:
+                    light_index = i
+                    break
 
-	if self.waypoints is not None:
-		car_x = self.pose.pose.position.x
-		car_y = self.pose.pose.position.y
-		
-		for each in self.lights:
-			light_x = each.pose.pose.position.x
-			light_y = each.pose.pose.position.y
-			if(light_x < stop_at):
-				if(light_x > car_x):
-					stop_at = light_x
-					#Need Attention: sometime y value of traffic light is not alligned with waypoint y
-					# car_y is assigned to get an approximation
-					each.pose.pose.position.y = car_y
-					light = each
-				
+            if light_index != -1:
+                # TODO(jason): start using this instead when the classifier is
+                # working
+                # light_state = self.get_light_state()
 
-        '''
-        next_stop_x, next_stop_y will give the (x,y) coordinate of next traffic light.
-        We need to set the 'light' variable to True at a safe distance from where car can slow-down/stop.
-        '''
-        if light:
-	    light_wp = self.get_closest_waypoint(light.pose.pose)
-	    state = light.state
-            return light_wp, state
-        #self.waypoints = None #Need Attention: Not sure why it was set to None
-        return -1, TrafficLight.UNKNOWN
+                # there's actually a light so find closest light to waypoint in
+                # order to get color.
+                sl_wp = self.waypoints.waypoints[light_index]
+                dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2)
+                best_d = 100
+                for l in self.lights:
+                    d = dl(sl_wp.pose.pose.position, l.pose.pose.position)
+                    if d < best_d:
+                        best_d = d
+                        light = l
+                light_state = light.state
+
+
+        return light_index, light_state
 
 if __name__ == '__main__':
     try:
