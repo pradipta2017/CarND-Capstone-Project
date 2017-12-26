@@ -114,6 +114,7 @@ class DBWNode(object):
 			# Here we have to take care about the car states (the car can swich off the dbw) not sure 	how to do it (maybe restart controller?)
 		if not self.dbw_enabled:
 			rospy.loginfo("dbw not enabled")
+			self.controller.reset_pid()
 
 	def current_velocity_cb(self, msg):
 		self.curr_vel = msg.twist.linear.x
