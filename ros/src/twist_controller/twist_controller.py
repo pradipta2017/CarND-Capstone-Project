@@ -59,7 +59,7 @@ class Controller(object):
 		
 		# Throttle -> since DELTA_T is constant, we only need to know the difference between current velocity and proposed velocity
 		diff_vel = linear_velocity - current_velocity
-                rospy.loginfo("linear: %s, current: %s, diff: %s", linear_velocity, current_velocity, diff_vel)
+                #rospy.loginfo("linear: %s, current: %s, diff: %s", linear_velocity, current_velocity, diff_vel)
 
                 # NOTE(jason): not sure if this is the correct usage of these
                 # limits, but seems reasonable based on their configured values

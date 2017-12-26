@@ -87,7 +87,10 @@ class WaypointUpdater(object):
 			    # distance to the light
 			    velocity = 0.0
 			    for i in range(self.traffic_light_index - index, 0, -1):
-				next_waypoints.waypoints[i].twist.twist.linear.x = min(velocity, next_waypoints.waypoints[i].twist.twist.linear.x)
+				v = min(velocity, next_waypoints.waypoints[i].twist.twist.linear.x)
+				if v < 1.0:
+				    v = 0.0
+				next_waypoints.waypoints[i].twist.twist.linear.x = v
 				velocity += 0.2
 			else:
 			    for wp in next_waypoints.waypoints:

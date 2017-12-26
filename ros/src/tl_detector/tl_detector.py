@@ -203,7 +203,7 @@ class TLDetector(object):
             # are.  It seems like they're still pretty small in the simulator
             # when it detects them.
             for i in self.stop_line_waypoints:
-                if i > car_index and i - car_index < 200:
+                if i > car_index and i - car_index < 100:
                     light_index = i
                     break
 
