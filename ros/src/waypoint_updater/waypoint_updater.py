@@ -58,6 +58,7 @@ class WaypointUpdater(object):
 		self.pitch = 0
 		self.roll = 0
                 self.waypoints = []
+		self.max_velocity = 0.0
 		self.traffic_light_index = -1
 		self.bridge = CvBridge()
 		
@@ -91,11 +92,11 @@ class WaypointUpdater(object):
 			else:
 			    for wp in next_waypoints.waypoints:
 				# TODO(jason): need to properly handle
-				# velocity.  This is here to since the waypoint
+				# velocity.  This is here since the waypoint
 				# linear velocity is overwritten on
 				# deceleration.  See above comment about deep
 				# copies.
-				wp.twist.twist.linear.x = 12
+				wp.twist.twist.linear.x = self.max_velocity
 
 			self.final_waypoints_pub.publish(next_waypoints)
 
@@ -121,6 +122,7 @@ class WaypointUpdater(object):
 
 	def waypoints_cb(self, waypoints):
 		self.waypoints = waypoints.waypoints
+		self.max_velocity = self.get_waypoint_velocity(self.waypoints[0])
 		# Maybe we can unsubscribe from this node since we don't need it anymore
 		self.base_waypoints_sub.unregister()
 
