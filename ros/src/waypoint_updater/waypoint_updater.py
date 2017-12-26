@@ -69,8 +69,17 @@ class WaypointUpdater(object):
 
 	def loop(self):
 		rate = rospy.Rate(50) # Spin 50Hz
+		# start slowing down 100 waypoints before the end?  Maybe
+		# excessive and should change based on a distance to the end
+		end_waypoints_stop_index = len(self.waypoints) - 100
 		while not rospy.is_shutdown():
 			index = self.get_closest_waypoints()
+			if index == -1:
+			    # NOTE(jason): various problems when we have don't
+			    # have a valid position so just skip until we do
+			    rate.sleep()
+			    continue
+
 			last_index = index + LOOKAHEAD_WPS
 
 			next_waypoints = Lane()
@@ -82,12 +91,20 @@ class WaypointUpdater(object):
 
 			#rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
 
-			if self.traffic_light_index != -1 and self.traffic_light_index >= index and self.traffic_light_index <= last_index:
+			stop_index = -1
+			if self.traffic_light_index != -1:
+			    stop_index = self.traffic_light_index
+			elif last_index > end_waypoints_stop_index:
+			    stop_index = len(self.waypoints) - 1;
+
+			rospy.loginfo("stop_index: %s %s", stop_index, stop_index - index)
+			if stop_index - index > 0 and stop_index >= index and stop_index <= last_index:
 			    # TODO(jason): calculate decelaration based on the
 			    # distance to the light
 			    velocity = 0.0
-			    for i in range(self.traffic_light_index - index, 0, -1):
+			    for i in range(stop_index - index, 0, -1):
 				v = min(velocity, next_waypoints.waypoints[i].twist.twist.linear.x)
+				# TODO(jason): this check probably needs to be moved to twist_controller.py
 				if v < 1.0:
 				    v = 0.0
 				next_waypoints.waypoints[i].twist.twist.linear.x = v

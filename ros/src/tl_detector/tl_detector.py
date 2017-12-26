@@ -78,10 +78,10 @@ class TLDetector(object):
                     best_d = d
                     sli = i
 
-            sl_wp.append(sli)
-            wpx = self.waypoints.waypoints[sli].pose.pose.position.x
-            wpy = self.waypoints.waypoints[sli].pose.pose.position.y
-            #rospy.loginfo("found stop line i: %s wpx: %s, wpy: %s, best_d: %s", sli, wpx, wpy, best_d)
+            # not a waypoint near the stop line.  This is really just for the
+            # parking lot scenario that doesn't have any lights.
+            if sli != -1:
+                sl_wp.append(sli)
 
         rospy.loginfo("sl_wp: %s", sl_wp)
 
