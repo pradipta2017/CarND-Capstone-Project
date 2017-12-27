@@ -68,59 +68,70 @@ class WaypointUpdater(object):
 
 
 	def loop(self):
-		rate = rospy.Rate(50) # Spin 50Hz
-		# start slowing down 100 waypoints before the end?  Maybe
-		# excessive and should change based on a distance to the end
-		end_waypoints_stop_index = len(self.waypoints) - 100
-		while not rospy.is_shutdown():
-			index = self.get_closest_waypoints()
-			if index == -1:
-			    # NOTE(jason): various problems when we have don't
-			    # have a valid position so just skip until we do
-			    rate.sleep()
-			    continue
+	    rate = rospy.Rate(50) # Spin 50Hz
 
-			last_index = index + LOOKAHEAD_WPS
+	    started = False
+	    while not rospy.is_shutdown():
+		index = self.get_closest_waypoints()
+		if index == -1:
+		    # NOTE(jason): various problems when we have don't
+		    # have a valid position so just skip until we do
+		    rate.sleep()
+		    continue
 
-			next_waypoints = Lane()
-			next_waypoints.header.stamp = rospy.Time(0)
+		end_index = len(self.waypoints) - 1
 
-			# TODO(jason): maybe make this deep copy the waypoints
-			# so the velocities don't have to be reset below.
-			next_waypoints.waypoints = self.waypoints[index:last_index]
+		# NOTE(jason): clamp to end of waypoints
+		last_index = min(index + LOOKAHEAD_WPS, end_index)
 
-			#rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
+		# NOTE(jason): for some reason, the closest waypoint will
+		# initially be the end
+		if not started and index == end_index:
+		    rospy.loginfo("started after invalid index")
+		    started = True
+		    continue
 
-			stop_index = -1
-			if self.traffic_light_index != -1:
-			    stop_index = self.traffic_light_index
-			elif last_index > end_waypoints_stop_index:
-			    stop_index = len(self.waypoints) - 1;
+		next_waypoints = Lane()
+		next_waypoints.header.stamp = rospy.Time(0)
 
-			rospy.loginfo("stop_index: %s %s", stop_index, stop_index - index)
-			if stop_index - index > 0 and stop_index >= index and stop_index <= last_index:
-			    # TODO(jason): calculate decelaration based on the
-			    # distance to the light
-			    velocity = 0.0
-			    for i in range(stop_index - index, 0, -1):
-				v = min(velocity, next_waypoints.waypoints[i].twist.twist.linear.x)
-				# TODO(jason): this check probably needs to be moved to twist_controller.py
-				if v < 1.0:
-				    v = 0.0
-				next_waypoints.waypoints[i].twist.twist.linear.x = v
-				velocity += 0.2
-			else:
-			    for wp in next_waypoints.waypoints:
-				# TODO(jason): need to properly handle
-				# velocity.  This is here since the waypoint
-				# linear velocity is overwritten on
-				# deceleration.  See above comment about deep
-				# copies.
-				wp.twist.twist.linear.x = self.max_velocity
+		# TODO(jason): maybe make this deep copy the waypoints
+		# so the velocities don't have to be reset below.
+		next_waypoints.waypoints = self.waypoints[index:last_index]
 
-			self.final_waypoints_pub.publish(next_waypoints)
+		#rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
 
-			rate.sleep()
+		# Set all velocities to the max
+		for wp in next_waypoints.waypoints:
+		    # TODO(jason): This is here since the waypoint linear
+		    # velocity is overwritten on deceleration.  See above
+		    # comment about deep copies.
+		    wp.twist.twist.linear.x = self.max_velocity
+
+		stop_index = -1
+		if self.traffic_light_index != -1:
+		    stop_index = self.traffic_light_index
+		elif last_index == end_index:
+		    stop_index = end_index
+
+		next_stop_index = stop_index - index
+		rospy.loginfo("stop_index: %s next_stop_index: %s, index: %s, traffic_light_index: %s, last_index: %s", stop_index, next_stop_index, index, self.traffic_light_index, last_index)
+		if stop_index != -1:
+		    next_waypoints.waypoints[next_stop_index].twist.twist.linear.x = 0.0
+		    if next_stop_index > 0 and stop_index >= index and stop_index <= last_index:
+			#dist = self.distance(self.waypoints, index, stop_index)
+			#vinc = self.max_velocity/dist
+			#vinc = dist/float(stop_index - index)
+			# NOTE(jason): this could still be better
+			vinc = 0.2
+
+			velocity = 0.0
+			for i, wp in enumerate(next_waypoints.waypoints[:next_stop_index][::-1]):
+			    wp.twist.twist.linear.x = min(velocity, self.max_velocity)
+			    velocity += vinc
+
+		self.final_waypoints_pub.publish(next_waypoints)
+
+		rate.sleep()
 
 	def pose_cb(self, msg):
 		self.pose_x = msg.pose.position.x

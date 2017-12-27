@@ -53,10 +53,13 @@ class Controller(object):
 		# Return throttle, brake, steer
 		linear_velocity = kwargs['proposed_linear']
 		angular_velocity = kwargs['proposed_angular']
-		current_velocity = kwargs['curr_vel']
-		
+		current_velocity = max(kwargs['curr_vel'], 0)
+
 		brake, steering, throttle = 0.0, 0.0, 0.0
 		
+                if linear_velocity < 1.0:
+                    linear_velocity = 0.0
+
 		# Throttle -> since DELTA_T is constant, we only need to know the difference between current velocity and proposed velocity
 		diff_vel = linear_velocity - current_velocity
                 #rospy.loginfo("linear: %s, current: %s, diff: %s", linear_velocity, current_velocity, diff_vel)
@@ -66,38 +69,32 @@ class Controller(object):
                 if diff_vel > self.accel_limit:
                     diff_vel = self.accel_limit
                 if diff_vel < self.decel_limit:
-                    diff_vel = self.decel_limit;
+                    diff_vel = self.decel_limit
 
 		# Logic of throttle/break depending on diff_vel
-                # NOTE(jason): This check keeps from having a small amount of
-                # throttle happening when we're supposedly stopped.
-		if diff_vel > 0.01:
-                        # NOTE(jason): The throttle in the simulator display
-                        # seems to only ever show 0.02 or 0.9.  This might be
-                        # what's causing some mild braking occasionally (brake
-                        # values < 10)
-			throttle = self.pid_throttle.step(diff_vel, DELTA_T)
+                if diff_vel > self.brake_deadband:
+                    throttle = self.pid_throttle.step(diff_vel, DELTA_T)
                 elif diff_vel < -self.brake_deadband:
-                        newtons = self.total_vehicle_mass * (diff_vel/DELTA_T)
-                        brake_torque = newtons / self.wheel_radius
-                        brake = brake_torque * diff_vel * DELTA_T**2 
+                    newtons = self.total_vehicle_mass * (diff_vel/DELTA_T)
+                    brake_torque = newtons / self.wheel_radius
+                    brake = brake_torque * diff_vel * DELTA_T**2 
                 elif linear_velocity == 0.0:
-                        # This makes sure the car stays still when it's
-                        # supposed to be stopped and assumes the prior
-                        # waypoints properly slowed down.
-                        # Might need to modify if the car is on a hill to keep
-                        # from moving.
-                        brake = 10
+                    # This makes sure the car stays still when it's
+                    # supposed to be stopped and assumes the prior
+                    # waypoints properly slowed down.
+                    # Might need to modify if the car is on a hill to keep
+                    # from moving.
+                    brake = 10
                 else:
-                        # do nothing if we aren't stopped and minor difference
-                        pass
+                    # do nothing/coast
+                    pass
 
 		steering = self.yaw_controller.get_steering(linear_velocity, angular_velocity, current_velocity)
-		if steering > self.max_steer_angle: 
+		#if steering > self.max_steer_angle: 
 			# In order keep the lane, if the desired steering angle is > than max_steer_angle, we will 	have to slow down and set the steering to the maximum or slow down until steering < max_steer_angle
-			steering = max_steer_angle
+			#steering = max_steer_angle
 
-
+                #rospy.loginfo("throttle: %s, brake: %s, steering: %s", throttle, brake, steering)
 		return throttle, brake, steering
 
 	def reset_pid(self):
