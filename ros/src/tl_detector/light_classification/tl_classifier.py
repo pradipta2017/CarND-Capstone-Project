@@ -5,10 +5,10 @@ import os
 import six.moves.urllib as urllib
 import tarfile
 import tensorflow as tf
-from matplotlib import pyplot as plt
-from PIL import Image
+## from matplotlib import pyplot as plt
+## from PIL import Image
 from os import path
-import time
+## import time
 import cv2
 
 
@@ -46,10 +46,10 @@ def detect_red(img, Threshold=0.01):
 
 
 
-def load_image_into_numpy_array(image):
-    (im_width, im_height) = image.size
-    return np.array(image.getdata()).reshape(
-        (im_height, im_width, 3)).astype(np.uint8)
+## def load_image_into_numpy_array(image):
+##    (im_width, im_height) = image.size
+##    return np.array(image.getdata()).reshape(
+##        (im_height, im_width, 3)).astype(np.uint8)
 
 
 def read_traffic_lights(image, boxes, scores, classes, max_boxes_to_draw=20, min_score_thresh=0.5, traffic_ligth_label=10):
@@ -85,7 +85,7 @@ class TLClassifier(object):
 
         #--------Download model----------
         if path.isdir(MODEL_NAME) is False:
-            print('\n\nPlease wait while we download the model :)\n\n')
+            print('\nPlease wait while we download the model :)\n')
             opener = urllib.request.URLopener()
             opener.retrieve(DOWNLOAD_BASE + MODEL_FILE, MODEL_FILE)
             tar_file = tarfile.open(MODEL_FILE)
@@ -94,7 +94,7 @@ class TLClassifier(object):
                 if 'frozen_inference_graph.pb' in file_name:
                     tar_file.extract(file, os.getcwd())
 
-        print('\n\nModel download is done\n\n')
+        print('\nModel download is done\n')
         #--------Load a (frozen) Tensorflow model into memory
         detection_graph = tf.Graph()
         with detection_graph.as_default():
@@ -119,8 +119,6 @@ class TLClassifier(object):
         print('\n\n * * * * * SUCCESSFULLY LOADED THE GRAPH * * * * * \n\n')
 
 
-    def recognize(self):
-        print('I recognize that I have light classification :)\n')
 
 
     def get_classification(self, image):
