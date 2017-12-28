@@ -225,7 +225,8 @@ class TLDetector(object):
                 #light_state = light.state
                 light_state = self.get_light_state(light)
                 print("light_state is: {}".format(light_state))
-
+            else:
+                print('no light found')
 
 
         return light_index, light_state
