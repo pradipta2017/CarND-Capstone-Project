@@ -163,5 +163,3 @@ class TLClassifier(object):
             return TrafficLight.RED
         else:
             return TrafficLight.GREEN
-
-        return 0

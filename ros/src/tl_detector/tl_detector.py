@@ -223,7 +223,9 @@ class TLDetector(object):
                         best_d = d
                         light = l
                 #light_state = light.state
-                self.get_light_state(light)
+                light_state = self.get_light_state(light)
+                print("light_state is: {}".format(light_state))
+
 
 
         return light_index, light_state
