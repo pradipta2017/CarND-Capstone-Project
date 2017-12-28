@@ -28,6 +28,8 @@ class TLDetector(object):
         # callbacks being called before the object is fully initialized.
         # Should probably move all subscribes to the end of the constructor
         self.light_classifier = TLClassifier()
+        # NOTE(jason): setting this to None will use the simulator light states
+        #self.light_classifier = None
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -183,6 +185,9 @@ class TLDetector(object):
         if(not self.has_image):
             self.prev_light_loc = None
             return False
+
+        if self.light_classifier is None:
+            return light.state
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
