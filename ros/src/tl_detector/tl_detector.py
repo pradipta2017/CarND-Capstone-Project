@@ -76,6 +76,8 @@ class TLDetector(object):
                 d = math.sqrt((wpx - slp[0])**2 + (wpy - slp[1])**2)
                 if d < best_d:
                     best_d = d
+                    # TODO(jason): maybe this should be using the waypoint
+                    # before the closest
                     sli = i
 
             # not a waypoint near the stop line.  This is really just for the
@@ -156,7 +158,10 @@ class TLDetector(object):
                 psi = np.arctan2(pose_y - wp_y, pose_x - wp_x)
                 dtheta = np.abs(psi - yaw)
 
-                if (distance < closest_distance and dtheta < np.pi/4) :
+                # NOTE(jason): it seems like the yaw check might be missing the
+                # case when we're at the waypoint
+                #if (distance < closest_distance and dtheta < np.pi/4) :
+                if distance < closest_distance:
                     closest_distance = distance
                     closest_point = i
 
@@ -203,7 +208,7 @@ class TLDetector(object):
             # are.  It seems like they're still pretty small in the simulator
             # when it detects them.
             for i in self.stop_line_waypoints:
-                if i > car_index and i - car_index < 100:
+                if i >= car_index and i - car_index < 100:
                     light_index = i
                     break
 

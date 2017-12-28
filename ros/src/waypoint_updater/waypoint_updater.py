@@ -34,6 +34,7 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 REF_VELOCITY = 4.5 
 
+MAX_DECEL = 1.0
 
 class WaypointUpdater(object):
 	def __init__(self):
@@ -70,7 +71,10 @@ class WaypointUpdater(object):
 	def loop(self):
 	    rate = rospy.Rate(50) # Spin 50Hz
 
-	    started = False
+	    # TODO(jason): puts some buffer to make sure the car stops behind
+	    # the line.  Possibly should improve the stop line waypoint
+	    # selection
+	    STOP_LINE_OFFSET = 5
 	    while not rospy.is_shutdown():
 		index = self.get_closest_waypoints()
 		if index == -1:
@@ -84,50 +88,28 @@ class WaypointUpdater(object):
 		# NOTE(jason): clamp to end of waypoints
 		last_index = min(index + LOOKAHEAD_WPS, end_index)
 
-		# NOTE(jason): for some reason, the closest waypoint will
-		# initially be the end
-		if not started and index == end_index:
-		    rospy.loginfo("started after invalid index")
-		    started = True
-		    continue
+		rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
 
 		next_waypoints = Lane()
 		next_waypoints.header.stamp = rospy.Time(0)
 
-		# TODO(jason): maybe make this deep copy the waypoints
-		# so the velocities don't have to be reset below.
-		next_waypoints.waypoints = self.waypoints[index:last_index]
-
-		#rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
-
-		# Set all velocities to the max
-		for wp in next_waypoints.waypoints:
-		    # TODO(jason): This is here since the waypoint linear
-		    # velocity is overwritten on deceleration.  See above
-		    # comment about deep copies.
-		    wp.twist.twist.linear.x = self.max_velocity
-
 		stop_index = -1
 		if self.traffic_light_index != -1:
-		    stop_index = self.traffic_light_index
-		elif last_index == end_index:
-		    stop_index = end_index
+		    stop_index = self.traffic_light_index - STOP_LINE_OFFSET
 
-		next_stop_index = stop_index - index
-		rospy.loginfo("stop_index: %s next_stop_index: %s, index: %s, traffic_light_index: %s, last_index: %s", stop_index, next_stop_index, index, self.traffic_light_index, last_index)
-		if stop_index != -1:
-		    next_waypoints.waypoints[next_stop_index].twist.twist.linear.x = 0.0
-		    if next_stop_index > 0 and stop_index >= index and stop_index <= last_index:
-			#dist = self.distance(self.waypoints, index, stop_index)
-			#vinc = self.max_velocity/dist
-			#vinc = dist/float(stop_index - index)
-			# NOTE(jason): this could still be better
-			vinc = 0.2
+		next_waypoints.waypoints = []
+		for i in range(index, last_index + 1):
+		    wp = self.waypoints[i]
+		    p = Waypoint()
+		    p.pose = wp.pose
+		    if stop_index == -1:
+			p.twist.twist.linear.x = wp.twist.twist.linear.x
+		    else:
+			d = self.distance(self.waypoints, i, stop_index)
+			v = math.sqrt(2*MAX_DECEL*d)
+			p.twist.twist.linear.x = min(v, wp.twist.twist.linear.x)
 
-			velocity = 0.0
-			for i, wp in enumerate(next_waypoints.waypoints[:next_stop_index][::-1]):
-			    wp.twist.twist.linear.x = min(velocity, self.max_velocity)
-			    velocity += vinc
+		    next_waypoints.waypoints.append(p)
 
 		self.final_waypoints_pub.publish(next_waypoints)
 
@@ -153,7 +135,7 @@ class WaypointUpdater(object):
 
 	def waypoints_cb(self, waypoints):
 		self.waypoints = waypoints.waypoints
-		self.max_velocity = self.get_waypoint_velocity(self.waypoints[0])
+		self.max_velocity = self.get_waypoint_velocity(self.waypoints[40])
 		# Maybe we can unsubscribe from this node since we don't need it anymore
 		self.base_waypoints_sub.unregister()
 
@@ -190,8 +172,11 @@ class WaypointUpdater(object):
 			# Since we want the closest waypoint ahead, we need to calculate the angle between the car 				and the waypoint
 			psi = np.arctan2(self.pose_y - wp_y, self.pose_x - wp_x)
 			dtheta = np.abs(psi - self.yaw)
-
-			if (distance < closest_distance and dtheta < np.pi/4) :
+ 
+			# NOTE(jason): it seems like the yaw check might be
+			# missing the case when we're at the waypoint
+			#if (distance < closest_distance and dtheta < np.pi/4) :
+			if distance < closest_distance:
 				closest_distance = distance
 				closest_point = i
 
