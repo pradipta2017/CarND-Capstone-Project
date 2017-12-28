@@ -5,4 +5,6 @@ data/loop_with_traffic_light.bag
 ros/build
 ros/devel
 ros/src/styx/profile.tmp
+ros/src/tl_detector/faster_rcnn_resnet101_coco_11_06_2017.tar.gz
+ros/src/tl_detector/faster_rcnn_resnet101_coco_11_06_2017/
 

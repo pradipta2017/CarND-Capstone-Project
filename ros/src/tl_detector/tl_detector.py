@@ -24,6 +24,11 @@ class TLDetector(object):
         self.camera_image = None
         self.lights = []
 
+        # NOTE(jason): loading this before callbacks are subscribed to avoid
+        # callbacks being called before the object is fully initialized.
+        # Should probably move all subscribes to the end of the constructor
+        self.light_classifier = TLClassifier()
+
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -40,19 +45,17 @@ class TLDetector(object):
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
         #rospy.loginfo("traffic light config: %s", self.config)
+        self.stop_line_waypoints = []
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
-
-        self.stop_line_waypoints = []
 
         rospy.spin()
 
@@ -233,6 +236,7 @@ class TLDetector(object):
             else:
                 print('no light found')
 
+            #rospy.loginfo("car_index: %s, sl_wp: %s, light_index: %s, light_state: %s", car_index, self.stop_line_waypoints, light_index, light_state)
 
         return light_index, light_state
 
