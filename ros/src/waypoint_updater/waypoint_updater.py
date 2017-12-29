@@ -83,12 +83,8 @@ class WaypointUpdater(object):
 		    rate.sleep()
 		    continue
 
-		end_index = len(self.waypoints) - 1
-
 		# NOTE(jason): clamp to end of waypoints
-		last_index = min(index + LOOKAHEAD_WPS, end_index)
-
-		rospy.loginfo("index: %s, traffic light: %s", index, self.traffic_light_index)
+		last_index = min(index + LOOKAHEAD_WPS, len(self.waypoints) - 1)
 
 		next_waypoints = Lane()
 		next_waypoints.header.stamp = rospy.Time(0)
@@ -98,7 +94,7 @@ class WaypointUpdater(object):
 		    stop_index = self.traffic_light_index - STOP_LINE_OFFSET
 
 		next_waypoints.waypoints = []
-		for i in range(index, last_index + 1):
+		for i in range(index, last_index):
 		    wp = self.waypoints[i]
 		    p = Waypoint()
 		    p.pose = wp.pose
@@ -110,6 +106,8 @@ class WaypointUpdater(object):
 			p.twist.twist.linear.x = min(v, wp.twist.twist.linear.x)
 
 		    next_waypoints.waypoints.append(p)
+
+                #rospy.loginfo("index: %s, last_index: %s, waypoints count: %s, traffic light: %s", index, last_index, len(next_waypoints.waypoints), self.traffic_light_index)
 
 		self.final_waypoints_pub.publish(next_waypoints)
 
