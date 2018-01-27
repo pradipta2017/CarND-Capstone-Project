@@ -237,9 +237,14 @@ class TLDetector(object):
                         light = l
                 #light_state = light.state
                 light_state = self.get_light_state(light)
-                print("light_state is: {}".format(light_state))
-            else:
-                print('no light found')
+                #Debug
+                #####print(" light_state is: {}".format(light_state))
+                #Pradipta: Assigning to previous state, when the classifier unable to detect/classify the traffic light
+                if ((self.last_state !=TrafficLight.UNKNOWN) and (light_state == TrafficLight.UNKNOWN)):
+                    light_state = self.last_state
+                self.last_state = light_state
+                #Debug                       
+                #####print("-light_state is: {}".format(light_state))
 
             #rospy.loginfo("car_index: %s, sl_wp: %s, light_index: %s, light_state: %s", car_index, self.stop_line_waypoints, light_index, light_state)
 
